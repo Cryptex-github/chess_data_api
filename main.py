@@ -181,15 +181,15 @@ async def fetch_official(db: aiosqlite.Connection, id: int) -> Dict[str, str]:
 
 async def fetch_tournament(db: aiosqlite.Connection, id: int) -> Dict[str, Any]:
     async with db.execute(
-            "SELECT * FROM tournaments WHERE id = ?", [id]
-    ) as cursor:
+                "SELECT * FROM tournaments WHERE id = ?", [id]
+        ) as cursor:
         row = await cursor.fetchone()
         if not row:
             raise NotFoundException(f"Tournament {id} does not exist!")
         rounds = {}
         c = 0
         while c < row['rounds']:
-            rounds.update({f"{c + 1}": (await fetch_games_by_rounds(db, id, c + 1))})
+            rounds[f"{c + 1}"] = await fetch_games_by_rounds(db, id, c + 1)
             c += 1
         return {
             "id": row["id"],
@@ -303,8 +303,9 @@ async def fetch_games_by_rounds(db: aiosqlite.Connection, id: int, round: int) -
 async def add_win(db: aiosqlite.Connection, id: int) -> Dict[str, str]:
     player = await fetch_player(db, id)
     await db.execute(
-            f"UPDATE players SET wins = ? WHERE id = ?", [player['wins'] + 1, id]
+        "UPDATE players SET wins = ? WHERE id = ?", [player['wins'] + 1, id]
     )
+
     await db.commit()
     return {
         "status": "ok"
@@ -314,7 +315,10 @@ async def add_win(db: aiosqlite.Connection, id: int) -> Dict[str, str]:
 async def add_loss(db: aiosqlite.Connection, id: int, ) -> Dict[str, str]:
     player = await fetch_player(db, id)
     await db.execute(
-            f"UPDATE players SET losses = ? WHERE id = ?", [player['losses'] + 1, id])
+        "UPDATE players SET losses = ? WHERE id = ?",
+        [player['losses'] + 1, id],
+    )
+
     await db.commit()
     return {
         "status": "ok"
@@ -434,14 +438,12 @@ async def resolve_game(request: web.Request) -> web.Response:
     info = await request.json()
     db = request.config_dict['DB']
     game = await fetch_game(db, game_id)
-    fields = {}
-    if game['result'] is None and game['official'] is None:
-        official = info['official']
-        fields['official'] = official
-        result = info['result']
-        fields['result'] = result
-    else:
+    if game['result'] is not None or game['official'] is not None:
         return web.json_response({"status": "game already resolved!"}, status=409)
+    official = info['official']
+    fields = {'official': official}
+    result = info['result']
+    fields['result'] = result
     if fields:
         field_names = ", ".join(f"{name} = ?" for name in fields)
         field_values = list(fields.values())
