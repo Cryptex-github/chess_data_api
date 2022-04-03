@@ -92,7 +92,6 @@ class Migration(BaseMigration):
             """CREATE UNIQUE INDEX games_uindex ON games(round, tournament_id, board)"""
         )
         conn.commit()
-        pass
 
     def down(self, conn, c):
         """Run when calling 'rollback'."""
